@@ -1,31 +1,29 @@
-# Git
+# 只有 Dockerfile 里 COPY 的东西进镜像；这里排除本机的工作区数据、依赖和缓存
 .git/
-.gitignore
-
-# Backups
-backups/
-backup-*.tar.gz
-*.tar.gz
-
-# Environment (will be provided at runtime)
 .env
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.coverage
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo
 
-# Runtime directories (will be mounted as volumes)
+# 本机评测台工作区
+workspace/
+settings.json
+systems.json
+evals/
+builds/
+.cache/
+runs/
 data/
 logs/
 tmp/
 
-# Documentation (not needed in image)
-README.md
-QUICKSTART.md
-LICENSE
+# demo 的 PDF 版只给测试和格式对照用，用户体验用 demo-md
+datasets/demo/
 
-# Scripts (not needed in image)
-start.sh
-stop.sh
-update.sh
-backup.sh
-
-# OS
 .DS_Store
-Thumbs.db
+.gstack/

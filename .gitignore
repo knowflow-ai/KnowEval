@@ -14,3 +14,22 @@ backup-*.tar.gz
 # OS
 .DS_Store
 Thumbs.db
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.coverage
+runs/
+.gstack/
+web/tsconfig.tsbuildinfo
+
+
+# 评测台工作区（knoweval ui 用项目根目录当工作区时生成）：本机的系统接入、模型设置与评测结果
+/workspace/
+/settings.json
+/systems.json
+/evals/
+/builds/
+/.cache/

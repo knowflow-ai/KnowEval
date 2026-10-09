@@ -1,0 +1,14 @@
+# 被测系统：RAGFlow。命令行 knoweval run 用；评测台在「系统」页接入，不用这个文件。
+# 密钥写在环境变量里，这里只写变量名。Docker 里访问本机服务写 host.docker.internal。
+adapter: ragflow
+base_url: http://host.docker.internal:9380
+api_key_env: RAGFLOW_API_KEY
+version: "0.22.1"
+# 原样传给 POST /api/v1/datasets（建议写明嵌入模型，结果才可复现）
+dataset:
+  chunk_method: naive
+# 原样传给 POST /api/v1/chats
+chat: {}
+concurrency: 4
+ask_timeout_s: 180
+ingest_timeout_s: 3600

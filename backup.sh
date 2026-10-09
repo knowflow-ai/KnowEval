@@ -1,55 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# 备份 KnowEval 的数据：workspace/（系统接入、设置、测试集、评测结果）和 .env（含 API Key，注意保管）。
+#   ./backup.sh            备份到 backups/knoweval-时间.tar.gz
+#   ./backup.sh /some/dir  备份到指定目录
+set -euo pipefail
+cd "$(dirname "$0")"
 
-# ===============================================
-# KnowFlow Eval - 备份脚本
-# ===============================================
-
-set -e
-
-# 颜色输出
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-echo -e "${GREEN}================================================${NC}"
-echo -e "${GREEN}  KnowFlow Eval - 备份脚本${NC}"
-echo -e "${GREEN}================================================${NC}"
-echo ""
-
-# 创建备份目录
-BACKUP_DIR="backups"
-mkdir -p "$BACKUP_DIR"
-
-# 生成备份文件名
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/knowflow-eval-backup-$TIMESTAMP.tar.gz"
-
-echo "创建备份..."
-echo "备份目录:"
-echo "  - data/    (数据库)"
-echo "  - tmp/     (数据集和报告)"
-echo "  - logs/    (日志)"
-echo ""
-
-# 创建备份
-tar -czf "$BACKUP_FILE" data/ tmp/ logs/ .env 2>/dev/null || true
-
-# 检查备份大小
-BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-
-echo -e "${GREEN}✓ 备份完成！${NC}"
-echo ""
-echo "备份文件: $BACKUP_FILE"
-echo "备份大小: $BACKUP_SIZE"
-echo ""
-
-# 清理旧备份（保留最近 7 个）
-echo "清理旧备份（保留最近 7 个）..."
-cd "$BACKUP_DIR"
-ls -t knowflow-eval-backup-*.tar.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
-cd ..
-
-echo -e "${GREEN}✓ 清理完成${NC}"
-echo ""
-echo "恢复备份命令:"
-echo "  tar -xzf $BACKUP_FILE"
+DEST="${1:-backups}"
+mkdir -p "$DEST"
+FILE="$DEST/knoweval-$(date +%Y%m%d-%H%M%S).tar.gz"
+ITEMS=(workspace)
+[ -f .env ] && ITEMS+=(.env)
+tar -czf "$FILE" "${ITEMS[@]}"
+echo "已备份到 $FILE（含 .env 里的 API Key，请妥善保管）"
+echo "恢复：./stop.sh && tar -xzf $FILE && ./start.sh"

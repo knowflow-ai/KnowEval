@@ -1,0 +1,65 @@
+# 被测系统：企业自研 RAG，用请求模板与取值路径接入，不写代码。
+# 占位符：{{api_key}}（来自环境变量 api_key_env）、{{kb_name}}、{{kb_id}}、{{doc_id}}、{{question}}
+# 取值路径支持 $.a.b、$.a[0]、$.a[*]、$.a[*].b
+adapter: http
+base_url: http://my-rag.internal:8080
+api_key_env: MY_RAG_API_KEY
+version: "1.0"
+# 可选：回答里相对地址的图片从哪里下载，不填则用 base_url
+# image_base_url: http://my-rag.internal
+http:
+  headers:
+    Authorization: "Bearer {{api_key}}"
+  # 可选：很多系统出错也回 HTTP 200，用业务码判断成败（对建库、上传、查状态、问答都生效）
+  success: { path: $.code, equals: 0 }
+  error_message: $.message
+
+  # ---- 入库方式一：自动入库（推荐，每次评测建新库，结果可复现）----
+  ingest:
+    create_kb:                       # 每次评测建一个新库
+      method: POST
+      path: /api/kb
+      body: { name: "{{kb_name}}" }
+      id: $.data.id                  # 新建知识库 id 的取值路径
+    upload:                          # 每份文档一次 multipart 上传
+      path: /api/kb/{{kb_id}}/documents
+      file_field: file
+      form: { parse: "true" }        # 可选：随文件一起提交的表单字段
+      doc_id: $.data.id              # 配了 status 时必填
+    status:                          # 可选：异步解析时轮询到终态；不配就当上传即完成
+      path: /api/kb/{{kb_id}}/documents/{{doc_id}}
+      state: $.data.status
+      done: [done, completed]
+      failed: [failed, error]
+      error: $.data.error
+    poll_interval_s: 3
+    alive:                           # 可选：入库缓存复用前检查库还在不在
+      path: /api/kb/{{kb_id}}
+
+  # ---- 入库方式二：手工入库（删掉上面的 ingest，改填 kb_id；结果标 manual_ingest，表示文档由系统方预先导入）----
+  # kb_id: "your-kb-id"
+
+  ask:
+    method: POST
+    path: /api/chat
+    body:                            # 每题都应是新会话，不要带对话历史
+      query: "{{question}}"
+      knowledge_base: "{{kb_id}}"
+      stream: false
+    answer: $.data.answer
+    # 引用二选一：
+    # (a) 接口直接给出被引用的片段列表
+    citations: $.data.references[*]
+    citation_fields: { doc: $.document_name, page: $.page, text: $.content }
+    # (b) 正文里带编号标记（如 [ID:3]），按编号对回 contexts；正文判分前会去掉标记，原文留在 raw_text
+    # citation_marker: '\s*\[ID:(\d+)\]'
+    # marker_index_base: 0           # 编号从 0 还是 1 开始
+    # 可选：检索上下文，用于错题归因（检索没召回 / 召回了没用上）
+    contexts: $.data.contexts[*]
+    context_fields: { doc: $.document_name, page: $.page, text: $.content }
+    # 可选：回答带出的图（正文里的 <img> 与 Markdown 图片会自动识别，这里补接口单独返回的图）
+    # images: $.data.images[*]
+    # image_fields: { url: $.url, doc: $.document_name, page: $.page }
+concurrency: 4
+ask_timeout_s: 180
+ingest_timeout_s: 3600

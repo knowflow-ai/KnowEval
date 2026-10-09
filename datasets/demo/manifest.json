@@ -1,0 +1,36 @@
+{
+  "name": "demo",
+  "version": "0.0",
+  "license": "Apache-2.0",
+  "canary": "KNOWEVAL-CANARY-7f3a9c2e-demo-0.0",
+  "files": [
+    {
+      "name": "01-潮汐实时计算系统.pdf",
+      "sha256": "2481dbbcbfe321e0cf827f9de62f85196f939ef13051fb9f906bbf8beee01d4a"
+    },
+    {
+      "name": "02-沈墨.pdf",
+      "sha256": "12ed2cc9d70912f5826caeb66d851f496e3c992ece7f9db00080990948172bd9"
+    },
+    {
+      "name": "03-岚图研究院.pdf",
+      "sha256": "0270ef2eff95ea4b438937bc61a00885f63f32c4d7677cff9f5c5f3a879bb882"
+    },
+    {
+      "name": "04-潮汐系统技术参数手册.pdf",
+      "sha256": "97d16064a571dfd41fdeb29af0a99d4861955c1e7de038c4912a48f1172d276a"
+    },
+    {
+      "name": "05-潮汐v3.0发布公告.pdf",
+      "sha256": "b93bb061007ec92de900944a77aa0ac3b50c768fe29d0e6c991261e67c955f85"
+    },
+    {
+      "name": "06-岚图研究院2024年度报告.pdf",
+      "sha256": "a686d3370c8ba928da4ec355c9b9f6eedfc3f468fe4b9b181b3d47d5fd71ae43"
+    },
+    {
+      "name": "07-韩知微.pdf",
+      "sha256": "548122e774a9e8320a8996b70be9e197aef496f2989a443363ff2fa2e4402181"
+    }
+  ]
+}

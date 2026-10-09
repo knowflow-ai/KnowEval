@@ -1,41 +1,47 @@
-version: '3.8'
+# KnowEval 评测台
+#
+#   启动：./start.sh        （或 docker compose up -d --build）
+#   体验：./start.sh demo   （同时启动内置的演示 RAG 服务，没有自己的 RAG 系统也能跑通）
+#   打开：http://127.0.0.1:8780
+#
+# 数据都在 ./workspace：系统接入、模型设置、测试集、评测结果。API Key 写在 .env 里（见 .env.example）。
 
 services:
-  knowflow-eval:
-    image: zxwei/knowflow-eval:latest
-    container_name: knowflow-eval
+  knoweval:
+    build: .
+    image: knoweval:local
+    container_name: knoweval
     restart: unless-stopped
-
+    # 评测台没有登录：默认只映射到本机 127.0.0.1。要给局域网其他人用，改成 "8780:8780" 并自行加访问控制
     ports:
-      - "5003:80"
-
+      - "127.0.0.1:${KNOWEVAL_PORT:-8780}:8780"
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./tmp:/app/tmp
-
+      - ./workspace:/workspace
     env_file:
-      - .env
-
+      - path: .env
+        required: false
     environment:
-      - TZ=Asia/Shanghai
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-    networks:
-      - knowflow-network
-
+      TZ: Asia/Shanghai
+      # 内置演示服务的地址（只有 --profile demo 时才会起这个服务）
+      KNOWEVAL_DEMO_RAG_URL: http://demo-rag:18790
+      MOCK_RAG_API_KEY: demo
+    # 被测系统跑在宿主机上（比如本机的 KnowFlow）时，在评测台里把地址写成 http://host.docker.internal:9380
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
 
-networks:
-  knowflow-network:
-    driver: "bridge"
+  # 内置演示 RAG：按段落切分、按词重叠挑段落，只用来演示接口和流程
+  demo-rag:
+    profiles: ["demo"]
+    image: knoweval:local
+    container_name: knoweval-demo-rag
+    restart: unless-stopped
+    entrypoint: ["python", "/app/examples/mock_rag_server.py", "--host", "0.0.0.0", "--port", "18790"]
+    environment:
+      MOCK_RAG_API_KEY: demo
+    depends_on:
+      - knoweval

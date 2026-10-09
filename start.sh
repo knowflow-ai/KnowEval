@@ -1,101 +1,48 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# 启动 KnowEval 评测台（Docker）
+#   ./start.sh        启动评测台
+#   ./start.sh demo   同时启动内置的演示 RAG 服务（没有自己的 RAG 系统也能先跑通一遍）
+set -euo pipefail
+cd "$(dirname "$0")"
 
-# ===============================================
-# KnowFlow Eval - 启动脚本
-# ===============================================
-
-set -e
-
-# 颜色输出
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-echo -e "${GREEN}================================================${NC}"
-echo -e "${GREEN}  KnowFlow Eval - 启动脚本${NC}"
-echo -e "${GREEN}================================================${NC}"
-echo ""
-
-# 检查 Docker 是否安装
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}错误: Docker 未安装${NC}"
-    echo "请先安装 Docker: https://docs.docker.com/get-docker/"
-    exit 1
+if ! command -v docker >/dev/null 2>&1; then
+  echo "没有找到 docker：先安装 Docker（https://docs.docker.com/get-docker/）" >&2
+  exit 1
+fi
+if ! docker compose version >/dev/null 2>&1; then
+  echo "没有找到 docker compose 插件：升级 Docker Desktop，或安装 Compose v2" >&2
+  exit 1
 fi
 
-# 检查 Docker Compose 是否安装
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}错误: Docker Compose 未安装${NC}"
-    echo "请先安装 Docker Compose: https://docs.docker.com/compose/install/"
-    exit 1
-fi
-
-# 检查 .env 文件是否存在
 if [ ! -f .env ]; then
-    echo -e "${YELLOW}警告: .env 文件不存在${NC}"
-    echo "正在从 .env.example 创建 .env 文件..."
-    cp .env.example .env
-    echo -e "${YELLOW}请编辑 .env 文件，填入你的 API 密钥后再次运行此脚本${NC}"
-    echo ""
-    echo "必需配置项:"
-    echo "  - SILICONFLOW_API_KEY (或其他 LLM API Key)"
-    echo "  - RAGFLOW_API_KEY (如果使用 RAGFlow)"
-    echo "  - RAGFLOW_BASE_URL (如果使用 RAGFlow)"
-    exit 1
+  cp .env.example .env
+  echo "已从 .env.example 生成 .env：判分要用的大模型 Key（KNOWEVAL_LLM_API_KEY）和被测系统的 Key 写在里面"
+fi
+mkdir -p workspace
+
+PROFILE=()
+if [ "${1:-}" = "demo" ]; then
+  PROFILE=(--profile demo)
 fi
 
-# 检查必需的环境变量
-echo "检查配置..."
-source .env
+docker compose ${PROFILE[@]+"${PROFILE[@]}"} up -d --build
 
-if [ -z "$SILICONFLOW_API_KEY" ] && [ -z "$OPENAI_API_KEY" ] && [ -z "$DEEPSEEK_API_KEY" ]; then
-    echo -e "${RED}错误: 至少需要配置一个 LLM API Key${NC}"
-    echo "请在 .env 中配置以下之一:"
-    echo "  - SILICONFLOW_API_KEY"
-    echo "  - OPENAI_API_KEY"
-    echo "  - DEEPSEEK_API_KEY"
-    exit 1
-fi
-
-# 创建必需的目录
-echo "创建必需的目录..."
-mkdir -p data logs tmp/datasets tmp/evaluation/reports
-
-# 拉取最新镜像
-echo "拉取最新镜像..."
-docker-compose pull
-
-# 启动服务
-echo "启动服务..."
-docker-compose up -d
-
-# 等待服务启动
-echo "等待服务启动..."
-sleep 10
-
-# 检查服务健康状态
-echo "检查服务健康状态..."
-for i in {1..30}; do
-    if curl -f http://localhost:5003/health &> /dev/null; then
-        echo -e "${GREEN}✓ 服务启动成功！${NC}"
-        echo ""
-        echo -e "${GREEN}================================================${NC}"
-        echo -e "${GREEN}  服务访问信息${NC}"
-        echo -e "${GREEN}================================================${NC}"
-        echo ""
-        echo "  Web 界面: http://localhost:5003"
-        echo "  健康检查: http://localhost:5003/health"
-        echo ""
-        echo "查看日志: docker-compose logs -f"
-        echo "停止服务: docker-compose down"
-        echo ""
-        exit 0
+PORT="${KNOWEVAL_PORT:-8780}"
+echo -n "等评测台启动"
+for _ in $(seq 1 60); do
+  if curl -fs "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
+    echo
+    echo "评测台已启动：http://127.0.0.1:${PORT}"
+    echo "下一步：在「设置」页填判分模型的地址和模型名（Key 写在 .env 的 KNOWEVAL_LLM_API_KEY），再到「系统」页接入被测系统。"
+    if [ "${1:-}" = "demo" ]; then
+      echo "体验：「系统」页点「一键接入演示系统」，再「新建评测 → 完整测试」选 demo-md 测试集。"
     fi
-    echo "等待中... ($i/30)"
-    sleep 2
+    echo "查看日志：docker compose logs -f knoweval    停止：./stop.sh"
+    exit 0
+  fi
+  echo -n "."
+  sleep 2
 done
-
-echo -e "${YELLOW}警告: 服务可能未正常启动${NC}"
-echo "请查看日志: docker-compose logs"
+echo
+echo "评测台没有按时启动，看看日志：docker compose logs knoweval" >&2
 exit 1

@@ -1,0 +1,46 @@
+[project]
+name = "knoweval"
+version = "0.1.0.dev0"
+description = "中文企业文档 RAG 的端到端开源评测工具：从原始文档入库到回答，整条链路一起测"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "ragas==0.4.3",
+    # ragas 0.4.3 顶层引用 langchain_community.chat_models.vertexai，0.4 起该模块已删除
+    "langchain-community>=0.3,<0.4",
+    "pydantic>=2.6",
+    "httpx>=0.27",
+    "pyyaml>=6",
+    "typer>=0.12",
+    "rich>=13",
+    # 出题流水线的参考解析：只用来取每页文本校验证据，不交给被测系统
+    "pymupdf>=1.24",
+    # Word、PPT、Excel 转文字出题（纯 CPU，不调模型）
+    "markitdown[docx,pptx,xlsx]>=0.1",
+    # 虚构语料与 demo 数据集渲染 PDF
+    "reportlab>=4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "pytest-asyncio>=0.23", "pypdf>=4", "python-docx>=1"]
+
+[project.scripts]
+knoweval = "knoweval.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/knoweval"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
+# PyMuPDF 的 SWIG 绑定在导入时报的弃用警告，与本项目无关
+filterwarnings = ["ignore:builtin type .* has no __module__ attribute:DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["knoweval"]

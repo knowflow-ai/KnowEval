@@ -1,118 +1,48 @@
-# ===============================================
-# RAG 评估系统 - 生产环境 Dockerfile
-# 前后端一体化部署，源码不公开
-# ===============================================
+# KnowEval 评测台镜像：前端在第一阶段构建，打进 Python 包；运行时只有一个 Python 进程。
+# 构建：docker compose build（或 docker build -t knoweval:local .）
 
-FROM node:20-alpine AS frontend-builder
+# ---------- 第一阶段：构建前端（单文件 HTML，评测台和报告共用） ----------
+FROM node:20-slim AS web
+WORKDIR /build/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY web/ ./
+# copy-template 会把产物写进 ../src/knoweval/web/report.html，这里只要 dist/index.html
+RUN mkdir -p ../src/knoweval/web && npm run build
 
-WORKDIR /build/frontend
-
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci && npm cache clean --force
-
-COPY frontend/ ./
-RUN npm run build
-
-FROM python:3.10-slim
-
-LABEL maintainer="RAG Evaluation Team"
-LABEL description="RAG Evaluation System - All-in-one Container"
-
-WORKDIR /app
+# ---------- 第二阶段：运行环境 ----------
+FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONPATH=/app
+    # 容器里监听所有网卡；宿主机能不能访问由 docker-compose.yml 的端口映射决定（默认只映射到 127.0.0.1）
+    KNOWEVAL_HOST=0.0.0.0 \
+    KNOWEVAL_PORT=8780 \
+    KNOWEVAL_WORKSPACE=/workspace
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    nginx \
-    supervisor \
-    curl \
-    git \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY pyproject.toml README.md LICENSE ./
+COPY src/ ./src/
+COPY --from=web /build/web/dist/index.html ./src/knoweval/web/report.html
+RUN pip install --no-cache-dir . && rm -rf /root/.cache
 
-COPY backend/requirements.txt /tmp/
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
-    rm /tmp/requirements.txt
+# 自带的公开数据集与演示服务；首次启动时数据集拷进工作区
+COPY datasets/ /app/datasets/
+COPY examples/ /app/examples/
+COPY configs/ /app/configs/
+COPY docker/entrypoint.sh /usr/local/bin/knoweval-entrypoint
+RUN chmod +x /usr/local/bin/knoweval-entrypoint \
+    && useradd --create-home --uid 1000 knoweval \
+    && mkdir -p /workspace && chown knoweval:knoweval /workspace
 
-COPY backend/*.py /app/
-COPY backend/services/ /app/services/
-COPY backend/models/ /app/models/
+USER knoweval
+VOLUME ["/workspace"]
+EXPOSE 8780
 
-# 编译 Python 文件为 .pyc (使用 -b 生成 .pyc 在源文件旁边，而不是 __pycache__)
-RUN python3 -m compileall -b /app && \
-    find /app -type f -name "*.py" ! -name "__init__.py" -delete
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"KNOWEVAL_PORT\",\"8780\")}/api/health', timeout=4)" || exit 1
 
-COPY --from=frontend-builder /build/frontend/dist /app/static
-
-RUN echo 'server {\n\
-    listen 80;\n\
-    server_name _;\n\
-    root /app/static;\n\
-    index index.html;\n\
-    \n\
-    location / {\n\
-        try_files $uri $uri/ /index.html;\n\
-    }\n\
-    \n\
-    location /api/ {\n\
-        proxy_pass http://127.0.0.1:5002;\n\
-        proxy_http_version 1.1;\n\
-        proxy_set_header Host $host;\n\
-        proxy_set_header X-Real-IP $remote_addr;\n\
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
-        proxy_set_header X-Forwarded-Proto $scheme;\n\
-        proxy_connect_timeout 60s;\n\
-        proxy_send_timeout 60s;\n\
-        proxy_read_timeout 300s;\n\
-    }\n\
-    \n\
-    location /health {\n\
-        proxy_pass http://127.0.0.1:5002/health;\n\
-        access_log off;\n\
-    }\n\
-}' > /etc/nginx/sites-available/default
-
-RUN echo '[supervisord]\n\
-nodaemon=true\n\
-user=root\n\
-logfile=/var/log/supervisor/supervisord.log\n\
-pidfile=/var/run/supervisord.pid\n\
-loglevel=info\n\
-\n\
-[program:nginx]\n\
-command=/usr/sbin/nginx -g "daemon off;"\n\
-autostart=true\n\
-autorestart=true\n\
-priority=10\n\
-stdout_logfile=/dev/stdout\n\
-stdout_logfile_maxbytes=0\n\
-stderr_logfile=/dev/stderr\n\
-stderr_logfile_maxbytes=0\n\
-\n\
-[program:backend]\n\
-command=python3 app_new.pyc\n\
-directory=/app\n\
-autostart=true\n\
-autorestart=true\n\
-priority=20\n\
-stdout_logfile=/dev/stdout\n\
-stdout_logfile_maxbytes=0\n\
-stderr_logfile=/dev/stderr\n\
-stderr_logfile_maxbytes=0\n\
-environment=PYTHONPATH="/app",PYTHONUNBUFFERED="1"\n\
-' > /etc/supervisor/conf.d/rag-evaluation.conf
-
-RUN mkdir -p /var/log/supervisor /app/tmp /app/logs /app/data && \
-    chmod -R 755 /app
-
-EXPOSE 80
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost/health || exit 1
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+ENTRYPOINT ["knoweval-entrypoint"]
+CMD ["ui"]

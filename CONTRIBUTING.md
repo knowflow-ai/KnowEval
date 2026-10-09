@@ -1,136 +1,59 @@
-# 贡献指南
+# 参与贡献
 
-感谢你对 KnowFlow Eval 的关注！
+欢迎提 Issue 和 PR：报 bug、补数据集、接入新的被测系统、改进出题和判分，都很需要。
 
-## 问题反馈
+## 报问题
 
-如果你在使用过程中遇到问题，请按以下步骤操作：
+请附上：
 
-### 1. 检查文档
+- 怎么复现（用的哪个数据集、哪种评测路线、被测系统是什么）；
+- 期望的结果和实际的结果；
+- 评测详情页「运行信息」里的内容，或者运行目录里的 `run.json`（里面只有环境变量名，没有 Key）。
 
-- [README.md](README.md) - 完整部署文档
-- [QUICKSTART.md](QUICKSTART.md) - 快速开始指南
-- [CHANGELOG.md](CHANGELOG.md) - 版本更新日志
+被测系统那边的问题（比如 KnowFlow 的嵌入模型没配置）不在这里修，但如果评测台给的提示不够清楚，也欢迎提。
 
-### 2. 常见问题
+## 本地开发
 
-在提交 Issue 之前，请先查看 [README.md](README.md) 的"常见问题"章节。
+```bash
+# 后端（Python 3.11+）
+python -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+pytest
 
-### 3. 提交 Issue
-
-如果问题未解决，请提交 Issue 并包含：
-
-- **环境信息**：
-  - 操作系统及版本
-  - Docker 版本
-  - Docker Compose 版本
-
-- **配置信息**（隐藏敏感数据）：
-  - `.env` 配置项（移除 API Key）
-  - `docker-compose.yml` 修改内容
-
-- **错误信息**：
-  - 完整的错误日志
-  - 运行的命令
-  - 期望的结果 vs 实际结果
-
-- **复现步骤**：
-  - 详细的操作步骤
-  - 最小化复现用例
-
-### Issue 模板
-
-```markdown
-**环境信息**
-- OS: Ubuntu 22.04
-- Docker: 24.0.5
-- Docker Compose: 2.20.2
-
-**问题描述**
-[详细描述你遇到的问题]
-
-**复现步骤**
-1. 执行 `./start.sh`
-2. 访问 http://localhost:5003
-3. 看到错误...
-
-**错误日志**
-\`\`\`
-[粘贴错误日志]
-\`\`\`
-
-**期望结果**
-[描述期望看到的结果]
-
-**实际结果**
-[描述实际看到的结果]
+# 前端（Node 20+）
+cd web
+npm ci
+npm test
+npm run build        # 产物写进 src/knoweval/web/report.html，评测台和报告共用这一个文件
 ```
 
-## 功能建议
+改了前端一定要 `npm run build` 并把 `src/knoweval/web/report.html` 一起提交，Python 包和 Docker 镜像用的都是它。
 
-我们欢迎功能建议！请提交 Issue 并包含：
+本地跑评测台：在一个工作区目录里执行 `knoweval ui`（默认 <http://127.0.0.1:8780>）。测试会在临时目录里运行，不会读你本机的 `.env` 和设置。
 
-- **使用场景**：为什么需要这个功能？
-- **预期效果**：功能应该如何工作？
-- **替代方案**：是否考虑过其他方案？
+## 约定
 
-## Pull Request
+- **先写测试**：新功能和修 bug 都先写一个会失败的测试，再改代码。
+- **失败也是结果**：被测系统超时、报错都要如实记录并计入分母，不能从统计里悄悄消失。
+- **被测系统是黑盒**：只通过适配器的 `ingest` / `ask` 打交道，不读它的数据库和内部分块。
+- **出题不用被测系统的解析器**：参考解析独立于 MinerU、DeepDOC 等，免得题目偏向某个系统。
+- **密钥不落盘**：API Key 只从环境变量读，写进任何配置或结果文件前都要去掉。
+- 界面文案和注释用中文，说清楚「为什么」。
 
-由于这是部署仓库，我们主要接受以下类型的 PR：
+## 提交信息
 
-### 可接受的 PR
+```
+<类型>: <一句话说明>
 
-- ✅ 文档改进（错别字、说明不清等）
-- ✅ 配置优化（环境变量、Docker Compose）
-- ✅ 脚本增强（start.sh、update.sh 等）
-- ✅ 示例补充（.env.example）
+<可选的详细说明>
+```
 
-### 不接受的 PR
+类型：`feat`、`fix`、`refactor`、`docs`、`test`、`chore`、`perf`、`ci`。
 
-- ❌ 源码修改（请在源码仓库提交）
-- ❌ Dockerfile 重大变更（需要重新构建镜像）
+## 数据集
 
-### PR 流程
+贡献文档和题目前请确认许可：可以公开分发的才进仓库；版权不允许分发的（比如上市公司年报），只提供下载清单和脚本，在 `manifest.json` 里标 `"redistribute": false`。题目格式见 [评测规范](docs/spec/eval-spec-v0.1.md) 和 [数据集设计](docs/spec/dataset-design-v0.1.md)。
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add some amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 开启 Pull Request
+## 许可
 
-### PR 要求
-
-- 清晰的标题和描述
-- 如果修改了脚本，请测试运行
-- 如果修改了文档，请检查格式
-- 遵循现有的代码风格
-
-## 文档贡献
-
-文档改进非常重要！你可以：
-
-- 修正错别字和语法错误
-- 补充缺失的说明
-- 添加更多示例
-- 翻译文档（English version）
-- 改进格式和可读性
-
-## 行为准则
-
-- 尊重他人
-- 保持专业
-- 建设性反馈
-- 保护隐私（不要泄露 API Key 等敏感信息）
-
-## 联系方式
-
-- GitHub Issues: https://github.com/KnowFlowRAG/KnowEval/issues
-- 讨论区: https://github.com/KnowFlowRAG/KnowEval/discussions
-
-## 致谢
-
-感谢所有贡献者！你的帮助让 KnowFlow Eval 变得更好。
-
----
-
-**注意**：本仓库是部署仓库，源码开发请访问主仓库（私有）。
+提交即表示你同意以 [Apache License 2.0](LICENSE) 发布你的贡献。

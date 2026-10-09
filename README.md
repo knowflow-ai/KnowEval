@@ -1,546 +1,178 @@
-# RAG 评估系统
+# KnowEval
 
-独立部署的 RAG (Retrieval-Augmented Generation) 系统评测工具，基于 RAGAS 框架构建。
+**中文企业文档 RAG 的端到端开源评测工具。** 从原始文档（PDF、Word、PPT、Excel……）出发，被测系统自己解析、分块、检索、回答，整条链路一起测，不拿切好的文本段落走捷径。拿一套题去问你的 RAG 系统（KnowFlow、RAGFlow，或者任何有 HTTP 接口的自研系统），测出三件事：
 
-## 🚀 特性
+- **谁答得准**：每道题由裁判模型判成「答对 / 坦白不知道 / 自信答错」三档，单位、量级、同义写法都能判；
+- **答不了的时候会不会说不知道**：无答案题上编造答案算错，能答的题却说不知道也单独统计；
+- **给出的引用能不能对上**：引用的文档和原文片段与标准证据逐条核对。
 
-- **多系统支持**: 可与 RAGFlow、LangChain 等多种 RAG 系统集成
-- **丰富指标**: 基于 RAGAS 框架的多种评测指标
-- **可视化报告**: 直观的评测结果展示
-- **批量评测**: 支持大规模数据集评测
-- **实时监控**: 实时查看评测进度和结果
+所有结论都带置信区间和噪声底线，两个配置差几个百分点，是真的变好了还是模型抖动，报告会直接告诉你。
 
-## 📋 评测指标
+![评测结果总览](docs/images/eval-overview.png)
 
-### LLM 基础指标
-- **忠实度 (Faithfulness)**: 评估回答是否基于提供的上下文
-- **答案相关性 (Answer Relevancy)**: 评估答案与问题的相关程度
-- **上下文精确度 (Context Precision)**: 评估检索到的上下文与问题的相关性
-- **上下文召回率 (Context Recall)**: 评估是否检索到回答问题所需的所有相关信息
+## 为什么做这个项目
 
-### 传统指标
-- **答案相似度 (Answer Similarity)**: 基于向量相似度的答案评估
-- **响应时间 (Response Time)**: 系统响应速度评测
-- **Token 使用量**: 计算资源消耗评估
+**我们自己需要。** 我们在做企业知识库产品 [KnowFlow](https://github.com/knowflow-ai/KnowFlow)，每次换解析器、改分块方式、调检索参数、换模型，都要回答同一个问题：效果到底是变好了还是变差了？靠人工挑几个问题试一试，既不全面，也分不清差别是真实的还是模型每次回答不一样造成的。我们需要一套能反复跑、结论可信的评测系统。
 
-## 🏗️ 系统架构
+**市面上找不到合适的。** 常见的 RAG 评测框架大多从切好的文本段落和现成的问答对开始，只评检索和生成两段，文档解析、分块这些在企业场景里最容易出问题的环节被跳过了。公开的中文 RAG 数据集也多是新闻、百科这类纯文本，和企业里真正用的文档差得很远：扫描件、跨页表格、多版本的制度文件、动辄几百页的技术手册和年报。
 
-```
-rag-evaluation/
-├── backend/                 # 后端服务
-│   ├── app.py              # Flask 应用入口
-│   ├── config.py           # 配置文件
-│   ├── evaluation.py       # 评测 API 路由
-│   ├── services/           # 业务逻辑层
-│   │   └── evaluation/     # 评测服务
-│   └── requirements.txt    # Python 依赖
-├── frontend/               # 前端界面
-│   ├── src/
-│   │   ├── components/     # React 组件
-│   │   ├── pages/          # 页面组件
-│   │   └── services/       # API 服务
-│   ├── package.json        # Node.js 依赖
-│   └── vite.config.ts      # Vite 配置
-└── README.md              # 项目文档
-```
+所以 KnowEval 做了两件事：
 
-## 🛠️ 安装部署
+- **端到端**：从原始文件出发，被测系统自己解析、分块、检索、回答，一次评测覆盖整条链路；
+- **贴近真实文档**：用你自己的文档（或者知识库里已有的文档）出题，每道题都要摘出原文证据并逐字核对，闭卷就能答对的题自动剔除，测出来的就是你的业务文档上的真实表现。
 
-### 方式一：Docker 部署（推荐）⭐
+## 题型：专考企业文档里容易出错的地方
 
-**最简单的部署方式**，无需手动配置 Python 和 Node.js 环境。
+只问「某个参数是多少」测不出差别，大多数系统都答得上来。KnowEval 按题型出题，每类题针对 RAG 链路上的一个薄弱环节，报告也按题型分开统计，一眼看出系统栽在哪一环：
 
-#### 使用预构建镜像（推荐）
+| 题型 | 考什么 | 怎么出题，保证题目站得住 |
+|---|---|---|
+| **单跳事实** F | 能不能找到答案所在的那一段 | 从文档里挑一页出题，证据逐字核对 |
+| **表格数值** T | 表格解析对不对：合并单元格、跨页表、数字和表头能不能对上 | 专挑数字密集的页出题 |
+| **长文档定位** L | 几百页的文档里，深处小节的内容还能不能检索到，分块有没有把上下文切断 | 只从最长文档的后半部分取材 |
+| **计算统计** C | 找到几个数之后会不会算：增长了多少、占比多少 | 模型只说「取哪几个数、怎么算」，答案由程序算出，不信模型的心算 |
+| **跨文档多跳** M | 答案分散在两份文档里，能不能都找到并串起来 | 先找出只在两份文档里同时出现的实体当「桥」，题目必须两页合起来才能答 |
+| **信息冲突** K | 同一份文档（制度、手册）有新旧两版时，会不会拿旧版本的说法作答 | 按文件名认出新旧两版（只差年份或版本号），程序比对出改动过的段落再出题；答新版算对，答旧版的值算错。没有成对的新旧版文档时不出这类题 |
+| **无答案** N | 文档里没有答案时，会不会坦白说不知道，而不是编一个 | 出和文档主题相近、但文档里查不到答案的题，出完再到最相关的几页里逐页查证确实没有，查到了就打回 |
+
+另外，单跳、表格、长文档三类里约四成的题会刻意换个说法提问，不照抄原文措辞：真实用户不会照着文档原文提问，只靠关键词匹配的系统会在这里露馅。新建测试集时可以调各题型的数量（默认每套约 26 道）。导入自己的题时还能用比较、时间推理、图表、图文答案、全局关系等题型，完整列表见[评测规范](docs/spec/eval-spec-v0.1.md)。
+
+## 能做什么
+
+- **测已有助手**：直接选 KnowFlow / RAGFlow 里配好的助手去问，模型、提示词、ColPali、SAG 检索等设置都以它为准，评测台不建、不改；开跑时把助手当时的配置记进报告。
+- **参数对照**：以一个助手为基准，每组只改几项参数（比如 SAG 策略 `multi` 和 `atomic`、`top_n`、重排模型、对话模型），评测台复制出临时助手问同一套题，跑完即删。
+- **完整测试**：选一套带文档的题，按不同的建库配置（分块方式、解析器、嵌入模型）各建一个知识库和助手，从入库到回答整条链路一起比。
+- **出题**：用自己的文档出题（PDF、Word、PPT、Excel、Markdown、TXT、HTML），按题型生成、逐字核对引文、闭卷过滤、开卷复答，出完可以在页面上逐题删改；也能直接从助手挂的知识库取文档出题，出完自动开始评测。
+- **报告**：总览、按题型拆分、逐题明细（回答、引用、判定依据）、多项对比（两两显著性、哪些题由对变错），可以导出成一个 HTML 文件发给别人。
+
+## 5 分钟上手
+
+需要 [Docker](https://docs.docker.com/get-docker/)（带 Compose v2），和一个 OpenAI 兼容接口的大模型 Key 用来判分（DeepSeek、通义、硅基流动、本地 vLLM 都行）。
 
 ```bash
-# 1. 克隆项目
 git clone https://github.com/KnowFlowRAG/KnowEval.git
-cd KnowEval/docker-deploy
-
-# 2. 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，配置必要的 API 密钥
-
-# 3. 启动服务（使用预构建镜像）
-./start.sh
-
-# 服务将在以下端口运行：
-# - 前端: http://localhost:5003
-# - 后端: http://localhost:5003/api
-```
-
-#### 快速命令
-
-```bash
-# 启动服务
-./start.sh
-
-# 停止服务
-./stop.sh
-
-# 更新镜像
-./update.sh
-
-# 备份数据
-./backup.sh
-
-# 查看日志
-docker-compose logs -f
-```
-
-#### 自定义构建
-
-如果需要修改代码后重新构建镜像：
-
-```bash
-# 1. 修改代码后，构建新镜像
 cd KnowEval
-docker build -t your-username/knoweval:latest .
-
-# 2. 修改 docker-compose.yml 中的镜像名
-# image: your-username/knoweval:latest
-
-# 3. 启动服务
-cd docker-deploy
-docker-compose up -d
+./start.sh demo        # 启动评测台 + 内置的演示 RAG 服务；首次会生成 .env
 ```
 
-#### Docker 部署配置
+1. 打开 `.env`，填上判分模型的 Key：`KNOWEVAL_LLM_API_KEY=sk-...`，然后 `./start.sh demo` 再执行一次让它生效；
+2. 浏览器打开 <http://127.0.0.1:8780>，到 **设置** 页填判分模型的接口地址和模型名（如 `https://api.deepseek.com/v1`、`deepseek-chat`），点「测试调用」；
+3. **系统** 页点「一键接入演示系统」；
+4. **评测** → 新建评测 → **完整测试** → 选 `demo-md` 测试集 → 勾「演示 RAG」→ 确认开始。
 
-在 `docker-deploy/.env` 中配置以下环境变量：
+几分钟后就能看到第一份报告。演示 RAG 只是按段落挑原文当回答，用来把流程走通，分数没有参考意义。
+
+## 接入你的系统
+
+在 **系统** 页点「接入系统」：
+
+| 系统 | 要填的 | 说明 |
+|---|---|---|
+| KnowFlow | 服务地址（API 端口，如 `http://host.docker.internal:9380`）、API Key 的环境变量名 | Key 在 KnowFlow 的「API」页生成，写进 `.env`（默认变量名 `KNOWFLOW_API_KEY`） |
+| RAGFlow | 同上 | 默认变量名 `RAGFLOW_API_KEY` |
+| 自研系统 | 提问接口（可选：建库、上传、查解析进度接口） | 把一条能跑通的 curl 贴进去，评测台解析成请求模板；点「试问一题」，在返回结果里点选哪里是答案、哪里是引用 |
+
+![系统页](docs/images/systems.png)
+
+被测系统跑在宿主机上时，容器里要用 `host.docker.internal` 代替 `localhost`。改了 `.env` 之后执行 `./start.sh` 让它生效。
+
+## 新建评测
+
+新建评测是一个分步向导，第一步先选测什么：
+
+![新建评测向导](docs/images/new-eval.png)
+
+**测已有助手**（KnowFlow / RAGFlow）
+
+1. 选系统和助手：表格里列出每个助手挂了哪些知识库、多少文档、用的什么模型；勾多个就是对比。
+2. 选题目：只列出题目出自这些助手知识库的测试集；没有就「从助手的知识库出一套新题」，可以配题数和题型。
+3. 参数对照（可选，只选一个助手时）：每组预填基准助手现在的全部参数，改哪项就对照哪项。
+4. 确认开始：开跑前会先试问几道题，接口报错（比如依赖的服务没起、模型被删了）或大多答「找不到」时会提醒你，并说明可能的原因。
+
+**完整测试**
+
+1. 选测试集（自带的公开数据集，或你出的题）；
+2. 选建库方式：勾几份建库配置（在系统页添加，预填了全部默认参数）各建一个知识库和助手，或者问自研系统的问答接口（文档先在测试集页「下载文档」，自己导入系统）；
+3. 确认开始。
+
+## 出题
+
+**测试集** 页 → 新建测试集，分两步：
+
+1. 文档：上传自己的文档，或从 KnowFlow / RAGFlow 的知识库取（从知识库出的题，「测已有助手」会自动配给挂了这些库的助手）；
+2. 题目：导入自己的题（CSV / JSONL），让模型按题型配比出题，或者两种都要，报告里按来源分开统计。只导入题目时可以不传文档，那就只按答案判对错、不查引用。
+
+- 支持 PDF、Word（.docx）、PPT（.pptx）、Excel（.xlsx）、Markdown、TXT、HTML。旧版 .doc / .ppt / .xls 请先另存为新格式；扫描版 PDF 没有文字层，暂时出不了题。
+- 出题和校验用「设置」页的同一个模型。文档用独立于被测系统的方式解析（PDF 用 PyMuPDF，Office 用 MarkItDown），不用 MinerU、DeepDOC 这类被测系统自己在用的解析器，免得题目偏向某个系统。
+- 每道题要逐字摘一句原文作证据；闭卷就能答对的题、开卷也答不出的题、无答案题其实能在资料里找到的，都会被自动打回。
+- 出完可以在页面上逐题删除、恢复、修改，或者手动加题；评测开始时存一份题目快照，之后再改题不影响已有评测。
+
+## 报告与指标
+
+![逐题明细：标准答案、系统回答、引用核对、判定依据](docs/images/eval-questions.png)
+
+| 指标 | 含义 |
+|---|---|
+| 准确率 | 有答案的题里答对的比例 |
+| 自信错答率 | 给出了结论的题里错了多少（含无答案题上编的答案），越低越好 |
+| 拒答正确率 | 无答案题里坦白说不知道的比例 |
+| 过度拒答率 | 能答的题却说不知道的比例 |
+| 引用可核对率 / 精确率 | 答对的题里引用能对上标准证据的比例 / 所有引用里对得上的比例 |
+
+四个主指标分开给，不合成一个总分；每个比例都带置信区间。建议每项跑两遍，报告会给出噪声底线，两次结果的差异在噪声范围内时会明确说明。
+
+判分规则和测试集格式见 [docs/spec/eval-spec-v0.1.md](docs/spec/eval-spec-v0.1.md)。
+
+## 命令行
+
+评测和看报告可以放进 CI 用命令行跑；出题、测已有助手、参数对照请用评测台。被测系统用一份 YAML 描述（示例见 `configs/`，复制到 `workspace/` 里改；容器里访问本机服务写 `host.docker.internal`）：
 
 ```bash
-# 必需配置
-RAGFLOW_BASE_URL=http://your-ragflow-host:9380
-RAGFLOW_API_KEY=your-ragflow-api-key
-
-# LLM API 配置（选择一个）
-OPENAI_API_KEY=your-openai-key                    # OpenAI
-SILICONFLOW_API_KEY=your-siliconflow-key         # SiliconFlow
-DEEPSEEK_API_KEY=your-deepseek-key               # DeepSeek
-
-# 数据持久化
-VOLUME_PATH=./data                                 # 数据存储路径
+cp configs/knowflow.example.yaml workspace/knowflow.yaml   # 改好地址和建库参数
+docker compose run --rm knoweval knoweval run --system /workspace/knowflow.yaml \
+  --dataset /workspace/datasets/demo-md --out /workspace/runs/demo
+docker compose run --rm knoweval knoweval report /workspace/runs/demo \
+  --html /workspace/runs/demo/report.html --dataset /workspace/datasets/demo-md
 ```
 
-#### Docker 架构
+`knoweval --help` 看全部命令：`run` 跑评测、`report` 出报告、`compare` 多系统对比、`diff` 两次运行对比、`judge` 换裁判重新判分、`review` 记人工改判、`dataset` 查看和下载数据集。命令行和评测台用同一份「设置」（工作区的 `settings.json`）和同一个 `.env`。
 
-```
-┌─────────────────────────────────────┐
-│   Docker Container (Port 5003)      │
-├─────────────────────────────────────┤
-│  ┌─────────────┐  ┌──────────────┐ │
-│  │   Nginx     │  │   Frontend   │ │
-│  │  (Port 80)  │  │   (Built)    │ │
-│  └──────┬──────┘  └──────────────┘ │
-│         │                           │
-│  ┌──────▼──────────────────────┐   │
-│  │   Backend API (Port 5002)   │   │
-│  │   - Flask Application       │   │
-│  │   - RAGAS Evaluation        │   │
-│  │   - SQLite Database         │   │
-│  └─────────────────────────────┘   │
-└─────────────────────────────────────┘
-         │
-         ▼
-   [External Services]
-   - RAGFlow API
-   - LLM API (OpenAI/SiliconFlow/etc)
-```
+## 自带数据集
 
-#### 数据持久化
+| 数据集 | 内容 | 许可 |
+|---|---|---|
+| `demo-md` | 虚构的几份 Markdown 文档、20 道题，几分钟跑完，用来体验 | Apache-2.0 |
 
-Docker 部署会将以下数据挂载到宿主机：
+要评测自己的业务，用自己的文档在「测试集」页出题，或直接测已有助手、从它的知识库出题。
+
+题目文件里带有金丝雀字符串（canary），请不要把数据集放进模型训练语料。仓库里的 `datasets/demo` 是 demo-md 的 PDF 版，只给自动化测试和文档格式对照用，不打进镜像。
+
+## 安全说明
+
+评测台**没有登录功能**。Docker 默认只把端口映射到本机 `127.0.0.1`；如果要给局域网里的其他人用，请自己在前面加一层访问控制（反向代理加认证、VPN 等）。API Key 只从环境变量（`.env`）读取，不会写进任何配置或结果文件。
+
+## 常用操作
 
 ```bash
-docker-deploy/data/
-├── evaluation.db          # SQLite 数据库
-├── datasets/              # 上传的数据集
-├── reports/               # 评测报告
-└── logs/                  # 应用日志
+./start.sh          # 启动（./start.sh demo 同时启动演示服务）
+./stop.sh           # 停止；数据都在 workspace/ 里
+./update.sh         # 拉取最新代码、重新构建并重启
+./backup.sh         # 备份 workspace/ 和 .env
+docker compose logs -f knoweval   # 看日志
 ```
 
-#### 故障排查
+## 常见问题
 
-```bash
-# 查看容器状态
-docker-compose ps
+**评测台连不上我本机的 KnowFlow？** 容器里的 `localhost` 是容器自己。把系统地址写成 `http://host.docker.internal:9380`。
 
-# 查看实时日志
-docker-compose logs -f
+**试问检查提示「依赖的服务没启动」/「模型没有配置」？** 这是被测系统那边的问题：比如 KnowFlow 助手开了 Agent 模式但 agent worker 没起，或者知识库用的嵌入模型被删了。在被测系统里直接问一句，能复现就是它的问题。
 
-# 重启服务
-docker-compose restart
+**大模型判分或出题超时？** 本地部署的大模型读长原文可能要一两分钟。超时的题会留在「待校验」，模型恢复后在测试集页点「重新校验」只补这几道。
 
-# 完全重建
-docker-compose down
-docker-compose up -d --build
+## 参与贡献
 
-# 进入容器调试
-docker-compose exec knowflow-eval bash
-```
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-更多 Docker 部署详情，请参考：[Docker 部署文档](docker-deploy/README.md)
+## 许可
 
----
-
-### 方式二：源码部署
-
-适合需要修改代码或深度定制的场景。
-
-#### 后端部署
-
-1. **环境准备**
-```bash
-# 克隆项目
-cd rag-evaluation/backend
-
-# 推荐：使用 Python 3.11 (与 pandas 兼容性最好)
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-
-# 升级 pip
-pip install --upgrade pip
-
-# 安装依赖 (使用最小依赖避免编译问题)
-pip install -r requirements-minimal.txt
-```
-
-2. **配置环境变量**
-```bash
-# 复制环境变量模板
-cp ../.env.example .env
-
-# 编辑配置文件
-vim .env
-```
-
-3. **启动服务**
-```bash
-# 开发环境
-python app_new.py
-
-# 生产环境
-gunicorn -w 4 -b 0.0.0.0:5002 app_new:app
-```
-
-### 前端部署
-
-1. **环境准备**
-```bash
-cd rag-evaluation/frontend
-
-# 安装依赖
-npm install
-# 或 yarn install
-```
-
-2. **配置环境变量**
-```bash
-# 复制环境变量模板
-cp .env.example .env
-
-# 根据需要修改配置
-```
-
-3. **启动服务**
-```bash
-# 开发环境
-npm run dev
-
-# 构建生产版本
-npm run build
-```
-
-## 📊 产品功能
-
-### 界面概览
-
-#### 1. 评测仪表盘
-
-![评测仪表盘](images/dashboard.png)
-
-评测仪表盘提供了全面的评测概览：
-- **知识库进度**: 实时显示评测完成进度（75/100）
-- **总评测次数**: 追踪历史评测记录（7次）
-- **活跃数据集**: 管理使用中的数据集（5个）
-- **平均耗时**: 监控评测性能（6.1分钟）
-- **详细指标得分**:
-  - 忠实度 (Faithfulness): 84.4%
-  - 答案正确性 (Answer Correctness): 67.9%
-  - 上下文精确度 (Context Precision): 55.2%
-  - 上下文召回率 (Context Recall): 100%
-  - 答案相关性 (Answer Relevancy): 43.8%
-- **任务状态分布**: 实时监控运行中（1个）、已完成（7个）任务
-
-#### 2. 数据集管理
-
-![数据集管理](images/dataset-management.png)
-
-强大的数据集管理功能：
-- **批量导入**: 支持上传 JSON、CSV、Excel 格式数据集
-- **AI 智能生成**: 基于知识库自动生成评测数据集
-- **数据集状态**:
-  - 已完成：可直接用于评测
-  - 自动参考答案：系统自动生成参考答案
-  - 问答上下文：包含问题、答案和上下文信息
-- **样本数量**: 每个数据集包含 1-10 个测试样本
-- **操作功能**: 预览、创建评测、删除数据集
-
-#### 3. 数据集预览
-
-![数据集预览](images/dataset-preview.png)
-
-详细的数据集内容展示：
-- **问题**: 显示评测问题
-- **参考答案**: 标准答案参考
-- **上下文**: 检索到的相关文档片段（多个上下文来源）
-- 支持查看完整的问答对和上下文内容
-
-#### 4. 评测任务管理
-
-![评测任务](images/evaluation-tasks.png)
-
-全面的任务管理界面：
-- **任务状态**:
-  - 进行中：显示实时进度（65%）
-  - 已完成：显示完成时间和结果
-- **任务信息**:
-  - 对话助手 ID
-  - 数据集来源
-  - 评测指标类型
-- **创建评测**: 一键创建新的评测任务
-
-#### 5. 评测报告
-
-![评测报告](images/evaluation-report.png)
-
-详细的评测结果分析：
-- **综合评分**: 展示整体评测得分
-- **知识库信息**: 显示评测的数据集来源
-- **样本数量**: 统计评测样本总数
-- **生成时间**: 记录报告生成时间戳
-- **查看详情**: 深入分析每个指标的表现
-
-## 📋 使用指南
-
-### 1. 创建数据集
-
-支持的文件格式：
-- JSON (推荐)
-- CSV
-- Excel (.xlsx, .xls)
-
-JSON 格式示例：
-```json
-[
-  {
-    "question": "什么是人工智能？",
-    "expected_answer": "人工智能是计算机科学的一个分支...",
-    "contexts": ["上下文信息1", "上下文信息2"],
-    "reference_contexts": ["参考上下文1", "参考上下文2"]
-  }
-]
-```
-
-**AI 智能生成数据集**：
-1. 进入数据集管理页面
-2. 点击"AI 智能生成数据集"
-3. 选择知识库和生成数量
-4. 系统自动生成问答对和参考答案
-
-### 2. 配置对话助手
-
-系统支持从 RAGFlow 获取对话助手列表，确保：
-- RAGFlow 服务正在运行
-- 配置了正确的 RAGFLOW_API_KEY
-
-### 3. 运行评测
-
-1. 在评测仪表盘点击"创建评测测试"
-2. 选择要评测的对话助手
-3. 选择评测数据集
-4. 选择评测指标（支持多选）：
-   - 忠实度 (Faithfulness)
-   - 答案正确性 (Answer Correctness)
-   - 上下文精确度 (Context Precision)
-   - 上下文召回率 (Context Recall)
-   - 答案相关性 (Answer Relevancy)
-5. 启动评测任务，实时查看进度
-
-### 4. 查看报告
-
-评测完成后，可以查看：
-- **总体评分**: 各指标的平均得分和标准差
-- **得分分布**: 可视化展示分数分布情况
-- **详细分数**: 每个样本的具体评分
-- **单个样本结果**: 查看问题、答案、上下文和各项指标得分
-- **导出报告**: 支持导出 JSON 格式的完整报告
-
-## 🔧 配置说明
-
-### 后端配置
-
-| 环境变量 | 说明 | 默认值 |
-|---------|------|--------|
-| `PORT` | 服务端口 | 5002 |
-| `RAGFLOW_BASE_URL` | RAGFlow 服务地址 | http://localhost:9380 |
-| `RAGFLOW_API_KEY` | RAGFlow API 密钥 | - |
-| `OPENAI_API_KEY` | OpenAI API 密钥 | - |
-| `SILICONFLOW_API_KEY` | 硅基流动 API 密钥 | - |
-| `DEFAULT_LLM_MODEL` | 默认 LLM 模型 | Qwen/Qwen2.5-32B-Instruct |
-
-### 前端配置
-
-| 环境变量 | 说明 | 默认值 |
-|---------|------|--------|
-| `VITE_API_BASE_URL` | 后端 API 地址 | http://localhost:5002/api/v1 |
-| `VITE_RAGFLOW_API_URL` | RAGFlow API 地址 | http://localhost:9380/api/v1 |
-
-## 🚀 快速开始
-
-### 方式一：Docker 一键部署 ⭐ (推荐)
-
-**最快 3 分钟完成部署！**
-
-```bash
-# 1. 克隆项目
-git clone https://github.com/KnowFlowRAG/KnowEval.git
-cd KnowEval/docker-deploy
-
-# 2. 配置环境变量（必需）
-cp .env.example .env
-# 编辑 .env，添加以下配置：
-#   - RAGFLOW_BASE_URL 和 RAGFLOW_API_KEY
-#   - 至少配置一个 LLM API (OpenAI/SiliconFlow/DeepSeek)
-
-# 3. 启动服务
-./start.sh
-
-# ✅ 完成！访问 http://localhost:5003
-```
-
-**Docker 部署优势**：
-- ✅ 无需安装 Python、Node.js
-- ✅ 一键启动，自动配置
-- ✅ 数据持久化，支持备份
-- ✅ 生产环境就绪
-
-### 方式二：源码开发部署
-
-适合需要修改代码的开发者。
-
-#### 自动安装脚本
-
-```bash
-cd KnowEval
-./install.sh  # 自动安装所有依赖
-
-# 启动系统
-./start.sh dev
-
-# 访问系统
-# - 前端: http://localhost:3001
-# - 后端: http://localhost:5002
-```
-
-#### 手动安装
-
-<details>
-<summary>展开查看手动安装步骤</summary>
-
-**1. 后端环境准备**
-```bash
-cd KnowEval/backend
-
-# 推荐使用 Python 3.10
-python3.10 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-
-# 安装依赖
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-**2. 前端环境准备**
-```bash
-cd KnowEval/frontend
-
-# 安装依赖
-npm install
-# 或 yarn install
-```
-
-**3. 启动服务**
-```bash
-# 后端（终端1）
-cd backend
-source venv/bin/activate
-python app_new.py
-
-# 前端（终端2）
-cd frontend
-npm run dev
-```
-
-**4. 访问系统**
-- 前端界面: http://localhost:3001
-- 后端 API: http://localhost:5002
-- API 文档: http://localhost:5002/api/v1/evaluation/docs
-
-</details>
-
-### ⚠️ Python 版本说明
-- **推荐**: Python 3.10 (兼容性最佳，无编译问题)
-- **支持**: Python 3.8 - 3.12
-- **问题**: Python 3.13 存在较多兼容性问题
-
-强烈建议使用 Python 3.10：
-```bash
-# 使用 pyenv 安装和管理 Python 版本
-brew install pyenv
-pyenv install 3.10.14
-pyenv local 3.10.14
-```
-
-## 🤝 贡献指南
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
-
-## 📄 许可证
-
-本项目基于 GNU Affero General Public License v3.0 (AGPL-3.0) 开源。
-
-**AGPL-3.0 主要特点**：
-- ✅ 允许商业使用
-- ✅ 允许修改和分发
-- ✅ 允许专利使用
-- ⚠️ 修改后的代码必须开源
-- ⚠️ 网络服务也需要提供源代码
-- ⚠️ 衍生作品必须使用相同许可证
-
-查看完整许可证内容：[LICENSE](LICENSE)
-
-如需商业授权或其他许可选项，请联系项目维护者。
-
-## 🆘 支持
-
-如果您遇到问题或有建议，请：
-1. 查看 [常见问题](docs/FAQ.md)
-2. 提交 [Issue](https://github.com/your-repo/rag-evaluation/issues)
-3. 联系维护者
-
-## 🎯 路线图
-
-- [ ] 支持更多 RAG 系统
-- [ ] 添加更多评测指标
-- [ ] 支持自定义评测模板
-- [ ] 增加团队协作功能
-- [ ] 支持评测结果对比
-- [ ] 添加性能基准测试
+代码和自带数据集里我们自己写的内容（虚构文档、全部题目）都以 [Apache License 2.0](LICENSE) 发布；数据集里的第三方文档许可见各自的 `manifest.json`。

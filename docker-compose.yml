@@ -12,9 +12,9 @@ services:
     image: knoweval:local
     container_name: knoweval
     restart: unless-stopped
-    # 评测台没有登录：默认只映射到本机 127.0.0.1。要给局域网其他人用，改成 "8780:8780" 并自行加访问控制
+    # 评测台没有登录：默认只映射到本机 127.0.0.1。要从别的机器访问，在 .env 里设 KNOWEVAL_BIND=0.0.0.0，并自行加访问控制
     ports:
-      - "127.0.0.1:${KNOWEVAL_PORT:-8780}:8780"
+      - "${KNOWEVAL_BIND:-127.0.0.1}:${KNOWEVAL_PORT:-8780}:8780"
     volumes:
       - ./workspace:/workspace
     # 短写法各版本 Compose 都认；.env 由 ./start.sh 从 .env.example 生成，直接用 docker compose 前先 cp .env.example .env
@@ -43,5 +43,12 @@ services:
     entrypoint: ["python", "/app/examples/mock_rag_server.py", "--host", "0.0.0.0", "--port", "18790"]
     environment:
       MOCK_RAG_API_KEY: demo
+    # 镜像自带的健康检查探的是评测台的 8780 端口，这里换成探演示服务自己的端口
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 18790), timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     depends_on:
       - knoweval

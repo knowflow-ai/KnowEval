@@ -29,6 +29,8 @@ npm run build        # 产物写进 src/knoweval/web/report.html，评测台和�
 
 改了前端一定要 `npm run build` 并把 `src/knoweval/web/report.html` 一起提交，Python 包和 Docker 镜像用的都是它。
 
+`./start.sh` 默认拉取 Docker Hub 上发布好的镜像；要在 Docker 里试自己的改动，用 `./start.sh --build` 从源码构建。
+
 本地跑评测台：在一个工作区目录里执行 `knoweval ui`（默认 <http://127.0.0.1:8780>）。测试会在临时目录里运行，不会读你本机的 `.env` 和设置。
 
 ## 约定

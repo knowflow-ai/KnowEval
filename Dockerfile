@@ -1,5 +1,5 @@
 # KnowEval 评测台镜像：前端在第一阶段构建，打进 Python 包；运行时只有一个 Python 进程。
-# 构建：docker compose build（或 docker build -t knoweval:local .）
+# 构建：./start.sh --build（或 docker compose build）；发布的镜像在 Docker Hub：knowflowai/knoweval
 
 # ---------- 第一阶段：构建前端（单文件 HTML，评测台和报告共用） ----------
 FROM node:20-slim AS web

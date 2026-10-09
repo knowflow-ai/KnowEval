@@ -50,10 +50,12 @@
 需要 [Docker](https://docs.docker.com/get-docker/)（带 Compose v2），和一个 OpenAI 兼容接口的大模型 Key 用来判分（DeepSeek、通义、硅基流动、本地 vLLM 都行）。
 
 ```bash
-git clone https://github.com/KnowFlowRAG/KnowEval.git
+git clone https://github.com/knowflow-ai/KnowEval.git
 cd KnowEval
-./start.sh demo        # 启动评测台 + 内置的演示 RAG 服务；首次会生成 .env
+./start.sh demo        # 拉取镜像，启动评测台 + 内置的演示 RAG 服务；首次会生成 .env
 ```
+
+镜像发布在 Docker Hub：[knowflowai/knoweval](https://hub.docker.com/r/knowflowai/knoweval)，目前只有 x86_64（amd64）版本。Apple Silicon 的 Mac 上 Docker 会用模拟运行，能用但慢一些，可以改用 `./start.sh demo --build` 从源码构建本机架构的镜像（第一次要几分钟）。
 
 1. 打开 `.env`，填上判分模型的 Key：`KNOWEVAL_LLM_API_KEY=sk-...`，然后 `./start.sh demo` 再执行一次让它生效；
 2. 浏览器打开 <http://127.0.0.1:8780>，到 **设置** 页填判分模型的接口地址和模型名（如 `https://api.deepseek.com/v1`、`deepseek-chat`），点「测试调用」；
@@ -154,18 +156,21 @@ docker compose run --rm knoweval knoweval report /workspace/runs/demo \
 ## 常用操作
 
 ```bash
-./start.sh          # 启动（./start.sh demo 同时启动演示服务）
+./start.sh          # 拉取镜像并启动（./start.sh demo 同时启动演示服务）
+./start.sh --build  # 改了代码，或拉不到镜像时：从源码构建再启动
 ./stop.sh           # 停止；数据都在 workspace/ 里
-./update.sh         # 拉取最新代码、重新构建并重启
+./update.sh         # 拉取最新代码和对应版本的镜像并重启（./update.sh --build 从源码构建）
 ./backup.sh         # 备份 workspace/ 和 .env
 docker compose logs -f knoweval   # 看日志
 ```
 
-不用脚本、直接 `docker compose up -d --build` 也可以，先 `cp .env.example .env` 一次（compose 文件要读它）。
+不用脚本、直接 `docker compose up -d` 也可以，先 `cp .env.example .env` 一次（compose 文件要读它）。
 
 ## 常见问题
 
 **Linux 上容器起不来，日志说工作区没有写权限？** 容器里以 uid 1000 运行。`./start.sh` 用 root 执行时会自动把 `workspace/` 交给它；用别的用户建过 `workspace/` 的，执行一次 `sudo chown -R 1000:1000 workspace` 再启动。
+
+**拉镜像很慢或拉不下来？** 给 Docker 配一个能用的镜像加速地址，或者用 `./start.sh --build` 从源码构建（需要能访问 npm 和 PyPI）。
 
 **评测台连不上我本机的 KnowFlow？** 容器里的 `localhost` 是容器自己。把系统地址写成 `http://host.docker.internal:9380`。
 

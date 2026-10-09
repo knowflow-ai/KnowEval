@@ -1,7 +1,8 @@
 # KnowEval 评测台
 #
-#   启动：./start.sh        （或 docker compose up -d --build）
-#   体验：./start.sh demo   （同时启动内置的演示 RAG 服务，没有自己的 RAG 系统也能跑通）
+#   启动：./start.sh          拉取 Docker Hub 上的镜像 knowflowai/knoweval 并启动
+#   体验：./start.sh demo     同时启动内置的演示 RAG 服务，没有自己的 RAG 系统也能跑通
+#   源码：./start.sh --build  改了代码时从源码构建镜像
 #   打开：http://127.0.0.1:8780
 #
 # 数据都在 ./workspace：系统接入、模型设置、测试集、评测结果。API Key 写在 .env 里（见 .env.example）。
@@ -9,7 +10,8 @@
 services:
   knoweval:
     build: .
-    image: knoweval:local
+    # 镜像版本跟代码版本走；KNOWEVAL_IMAGE 可以换成自己构建或私有仓库里的镜像
+    image: ${KNOWEVAL_IMAGE:-knowflowai/knoweval:0.1.0}
     container_name: knoweval
     restart: unless-stopped
     # 评测台没有登录：默认只映射到本机 127.0.0.1。要从别的机器访问，在 .env 里设 KNOWEVAL_BIND=0.0.0.0，并自行加访问控制
@@ -37,7 +39,7 @@ services:
   # 内置演示 RAG：按段落切分、按词重叠挑段落，只用来演示接口和流程
   demo-rag:
     profiles: ["demo"]
-    image: knoweval:local
+    image: ${KNOWEVAL_IMAGE:-knowflowai/knoweval:0.1.0}
     container_name: knoweval-demo-rag
     restart: unless-stopped
     entrypoint: ["python", "/app/examples/mock_rag_server.py", "--host", "0.0.0.0", "--port", "18790"]

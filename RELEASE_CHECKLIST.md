@@ -20,12 +20,17 @@
 
 - [ ] README 的命令、截图和当前版本一致
 - [ ] CHANGELOG 写了这个版本的变化，日期已填
-- [ ] `pyproject.toml` 的版本号已更新
+- [ ] 版本号已更新：`pyproject.toml`、`src/knoweval/__init__.py`、`docker-compose.yml` 里的默认镜像标签（三处一致）
 
 ### 数据集
 
 - [ ] 新增或修改的数据集，`manifest.json` 写明许可；版权不允许分发的文档标了 `"redistribute": false`，只给下载脚本
 - [ ] 题目文件带金丝雀字符串
+
+### 镜像
+
+- [ ] 用要发布的那个提交构建镜像，推到 Docker Hub：`knowflowai/knoweval:<版本号>` 和 `latest`
+- [ ] 在干净的机器上 `./start.sh demo` 能直接拉到这个镜像并启动（不走源码构建）
 
 ### 合入
 

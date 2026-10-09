@@ -9,6 +9,9 @@ else
   echo "不是 git 仓库，跳过拉取代码：请先手动更新源码"
 fi
 
+# docker-compose.yml 要读 .env：以前没生成过的补一份
+[ -f .env ] || cp .env.example .env
+
 PROFILE=()
 if docker compose --profile demo ps --services --status running 2>/dev/null | grep -q '^demo-rag$'; then
   PROFILE=(--profile demo)

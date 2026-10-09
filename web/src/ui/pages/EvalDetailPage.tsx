@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import CompareView from "../../components/CompareView";
 import ReportView from "../../components/ReportView";
 import { DocPreviewContext, type DocTarget } from "../../components/docLink";
-import { pct } from "../../data";
+import { fmtTime, pct } from "../../data";
 import type { CompareData, ReportData } from "../../types";
 import { type EvalDetail, type Participant, type Progress, api } from "../api";
 import { STATUS_COLOR, STATUS_TEXT, configSummary, currentRound, progressPercent } from "../logic";
@@ -104,7 +104,7 @@ export default function EvalDetailPage({ id }: { id: string }) {
     <>
       <PageHead
         title={<Space wrap><span>{detail.name}</span><Tag color={STATUS_COLOR[detail.status]}>{STATUS_TEXT[detail.status]}</Tag></Space>}
-        desc={`${detail.dataset_ref} · ${detail.participants.length} 个参评项 · 各跑 ${detail.repeats} 遍 · 创建于 ${detail.created_at.slice(0, 16).replace("T", " ")}`}
+        desc={`${detail.dataset_ref} · ${detail.participants.length} 个参评项 · 各跑 ${detail.repeats} 遍 · 创建于 ${fmtTime(detail.created_at)}`}
         extra={<>
           {detail.running && (
             <Popconfirm title="中止这次评测？" description="已答完的题会保留，重新开始从断点续跑。" okText="中止" cancelText="取消"

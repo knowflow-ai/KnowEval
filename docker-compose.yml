@@ -17,9 +17,9 @@ services:
       - "127.0.0.1:${KNOWEVAL_PORT:-8780}:8780"
     volumes:
       - ./workspace:/workspace
+    # 短写法各版本 Compose 都认；.env 由 ./start.sh 从 .env.example 生成，直接用 docker compose 前先 cp .env.example .env
     env_file:
-      - path: .env
-        required: false
+      - .env
     environment:
       TZ: Asia/Shanghai
       # 内置演示服务的地址（只有 --profile demo 时才会起这个服务）

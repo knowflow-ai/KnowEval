@@ -1,5 +1,6 @@
 import { Card, Descriptions, Table, Typography } from "antd";
 
+import { fmtTime } from "../data";
 import type { ReportData } from "../types";
 
 /** run.json 全文：任何结果都能追溯到当时的题目、系统配置、裁判与代码版本 */
@@ -23,7 +24,7 @@ export default function RunInfo({ data }: { data: ReportData }) {
         { key: "rep", label: "遍数", children: m.repeats },
         { key: "subset", label: "子集", children: m.subset ?? "全部" },
         { key: "ver", label: "版本", children: Object.entries(m.versions ?? {}).map(([k, v]) => `${k} ${v}`).join("，") },
-        { key: "time", label: "时间", children: `${m.started_at ?? ""} → ${m.finished_at ?? "未完成"}` },
+        { key: "time", label: "时间", children: `${m.started_at ? fmtTime(m.started_at) : ""} → ${m.finished_at ? fmtTime(m.finished_at) : "未完成"}` },
         { key: "canary", label: "金丝雀字符串", children: m.dataset?.canary },
       ]} />
       {!!data.summary.ingest?.docs?.length && <Card title="入库" size="small" style={{ marginTop: 16 }}>

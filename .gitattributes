@@ -1,0 +1,3 @@
+# 脚本在 Linux 容器和宿主机上执行：保持 LF 换行，Windows 上检出也不会被改成 CRLF（否则 shebang 失效）
+*.sh text eol=lf
+Dockerfile text eol=lf

@@ -161,7 +161,11 @@ docker compose run --rm knoweval knoweval report /workspace/runs/demo \
 docker compose logs -f knoweval   # 看日志
 ```
 
+不用脚本、直接 `docker compose up -d --build` 也可以，先 `cp .env.example .env` 一次（compose 文件要读它）。
+
 ## 常见问题
+
+**Linux 上容器起不来，日志说工作区没有写权限？** 容器里以 uid 1000 运行。`./start.sh` 用 root 执行时会自动把 `workspace/` 交给它；用别的用户建过 `workspace/` 的，执行一次 `sudo chown -R 1000:1000 workspace` 再启动。
 
 **评测台连不上我本机的 KnowFlow？** 容器里的 `localhost` 是容器自己。把系统地址写成 `http://host.docker.internal:9380`。
 

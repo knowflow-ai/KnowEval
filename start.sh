@@ -19,6 +19,10 @@ if [ ! -f .env ]; then
   echo "已从 .env.example 生成 .env：判分要用的大模型 Key（KNOWEVAL_LLM_API_KEY）和被测系统的 Key 写在里面"
 fi
 mkdir -p workspace
+# 容器里以 uid 1000 运行：Linux 上用 root 启动时，把工作区交给它，免得容器写不进去
+if [ "$(uname -s)" = "Linux" ] && [ "$(id -u)" = "0" ]; then
+  chown -R 1000:1000 workspace
+fi
 
 PROFILE=()
 if [ "${1:-}" = "demo" ]; then

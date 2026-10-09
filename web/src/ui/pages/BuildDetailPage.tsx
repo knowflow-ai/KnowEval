@@ -1,7 +1,7 @@
 import { Alert, App, Button, Card, Empty, Popconfirm, Progress, Segmented, Skeleton, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { QTYPE_NAME } from "../../data";
+import { QTYPE_NAME, fmtTime } from "../../data";
 import { type AfterReady, type BuildDetail, type BuildItem, type BuildStatus, type BuildSummary, api, downloadUrl } from "../api";
 import { go } from "../UiApp";
 import { QuestionDetail } from "./DatasetDetailPage";
@@ -165,7 +165,7 @@ export default function BuildDetailPage({ id }: { id: string }) {
     <>
       <PageHead
         title={<Space wrap><span>{d.name}</span><Tag color={BUILD_STATUS[d.status].color}>{BUILD_STATUS[d.status].text}</Tag></Space>}
-        desc={`${sourceText(d)} · ${d.docs} 份文档进入出题 · 创建于 ${d.created_at.slice(0, 16).replace("T", " ")}`}
+        desc={`${sourceText(d)} · ${d.docs} 份文档进入出题 · 创建于 ${fmtTime(d.created_at)}`}
         extra={<>
           <Button onClick={() => go({ page: "datasets" })}>返回</Button>
           {(busy || d.running) && (

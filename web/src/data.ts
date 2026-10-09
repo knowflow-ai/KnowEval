@@ -31,6 +31,14 @@ export const QTYPE_NAME: Record<string, string> = {
   V: "图表图片", L: "长文档定位", K: "信息冲突", N: "无答案", I: "图文答案", G: "全局关系",
 };
 
+/** 后端存 UTC 时间（ISO 8601），页面按浏览器本地时区显示成「YYYY-MM-DD HH:mm」；解析不了的原样返回 */
+export function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export function pct(v: number | null | undefined, digits = 1): string {
   return v === null || v === undefined ? "—" : `${(v * 100).toFixed(digits)}%`;
 }

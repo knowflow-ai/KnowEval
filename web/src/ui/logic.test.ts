@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { BuildSummary } from "./api";
 import { configSummary, currentRound, findQuote, formatJson, parseJsonObject, parseRoute, progressPercent, routeHash, testsetOptions, testsetParam, locateQuote } from "./logic";
+import { fmtTime } from "../data";
 
 describe("路由", () => {
   it("解析与生成互逆", () => {
@@ -154,5 +155,18 @@ describe("locateQuote", () => {
 
   it("没有页码也找不到就是 null", () => {
     expect(locateQuote(text, "完全不相干的一段话，原文里没有", null)).toBeNull();
+  });
+});
+
+describe("时间显示", () => {
+  it("后端存的是 UTC，页面按浏览器本地时区显示到分钟", () => {
+    vi.stubEnv("TZ", "Asia/Shanghai");
+    try {
+      expect(fmtTime("2026-10-09T05:31:12.5+00:00")).toBe("2026-10-09 13:31");
+      expect(fmtTime("2026-10-08T23:59:00+00:00")).toBe("2026-10-09 07:59");   // 跨天
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(fmtTime("不是时间")).toBe("不是时间");
   });
 });

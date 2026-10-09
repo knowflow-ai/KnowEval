@@ -1,6 +1,6 @@
 [project]
 name = "knoweval"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "中文企业文档 RAG 的端到端开源评测工具：从原始文档入库到回答，整条链路一起测"
 readme = "README.md"
 requires-python = ">=3.11"

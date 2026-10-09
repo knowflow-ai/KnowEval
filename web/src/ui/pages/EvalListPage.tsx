@@ -1,7 +1,7 @@
 import { Alert, App, Button, Card, Empty, List, Popconfirm, Skeleton, Space, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 
-import { pct } from "../../data";
+import { fmtTime, pct } from "../../data";
 import { type EvalRow, api } from "../api";
 import { STATUS_COLOR, STATUS_TEXT } from "../logic";
 import { go } from "../UiApp";
@@ -69,7 +69,7 @@ export default function EvalListPage() {
               </div>}>
               <List.Item.Meta
                 title={<Space wrap><span>{row.name}</span><Tag color={STATUS_COLOR[row.status]}>{STATUS_TEXT[row.status]}</Tag></Space>}
-                description={`${row.dataset_ref} · ${row.participants.length} 个参评项 · 各跑 ${row.repeats} 遍 · ${row.created_at.slice(0, 16).replace("T", " ")}`} />
+                description={`${row.dataset_ref} · ${row.participants.length} 个参评项 · 各跑 ${row.repeats} 遍 · ${fmtTime(row.created_at)}`} />
             </List.Item>
           )} />
         )}

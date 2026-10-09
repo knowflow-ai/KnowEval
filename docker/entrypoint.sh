@@ -4,6 +4,12 @@
 set -e
 
 WS="${KNOWEVAL_WORKSPACE:-/workspace}"
+# 容器里以 uid 1000 运行；宿主机上的 workspace/ 属于别的用户（比如用 root 建的）时写不进去，说清楚怎么修
+if ! touch "$WS/.write-test" 2>/dev/null; then
+  echo "工作区 $WS 没有写权限（容器以 uid $(id -u) 运行）。在宿主机上执行：sudo chown -R $(id -u):$(id -g) workspace，再重新启动" >&2
+  exit 1
+fi
+rm -f "$WS/.write-test"
 mkdir -p "$WS/datasets"
 for d in /app/datasets/*/; do
   name=$(basename "$d")

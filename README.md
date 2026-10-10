@@ -10,6 +10,8 @@
 
 ![评测结果总览](docs/images/eval-overview.png)
 
+一分钟看懂 KnowEval：[视频号演示视频](https://weixin.qq.com/sph/AzvUEk94j)
+
 ## 为什么做这个项目
 
 **我们自己需要。** 我们在做企业知识库产品 [KnowFlow](https://github.com/knowflow-ai/KnowFlow)，每次换解析器、改分块方式、调检索参数、换模型，都要回答同一个问题：效果到底是变好了还是变差了？靠人工挑几个问题试一试，既不全面，也分不清差别是真实的还是模型每次回答不一样造成的。我们需要一套能反复跑、结论可信的评测系统。
@@ -181,6 +183,21 @@ docker compose logs -f knoweval   # 看日志
 ## 参与贡献
 
 见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 相关开源项目
+
+| 项目 | 说明 |
+|---|---|
+| [KnowFlow](https://github.com/knowflow-ai/KnowFlow) | 企业知识库，KnowEval 最早就是为它做的评测 |
+| [KnowFlow Analytics](https://github.com/knowflow-ai/analytics) | 基于语义建模的智能问数 |
+
+## 联系我们
+
+| 渠道 | |
+|---|---|
+| 微信公众号 | KnowFlow 企业知识库 |
+| 微信 | skycode007 |
+| 官网 | <https://www.knowflowchat.cn> |
 
 ## 许可
 
